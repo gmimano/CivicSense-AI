@@ -24,3 +24,5 @@ numpy
 plotly                   # Alternative interactive charts
 tenacity                  # Retry logic for scraping/LLM calls
 tqdm
+pymupdf
+fitz
