@@ -1,26 +1,26 @@
-streamlit==1.38.0
-streamlit-authenticator==0.3.3
-supabase==2.9.0
-openai==1.51.0                  # Used by LangChain for OpenRouter
-langchain==0.3.0
-langchain-openai==0.2.0
-langchain-community==0.3.0
-unstructured[all-docs]==0.15.13  # Best-in-class PDF text extraction (handles Kenyan bills perfectly)
-pdf2image==1.17.0                # Required by unstructured for some PDFs
-pillow==10.4.0
-beautifulsoup4==4.12.3
-requests==2.32.3
-python-dotenv==1.0.1
-httpx==0.27.2
-pydantic==2.9.2
-pyarrow==17.0.0                  # Supabase pgvector dependency
-pgvector==0.3.0
-psycopg2-binary==2.9.9
-weasyprint==62.3                 # Beautiful PDF report generation
-altair==5.4.1                    # For nice charts in Streamlit
-vl-convert-python==1.6.1         # Required for Altair in Streamlit
-pandas==2.2.3
-numpy==2.1.2
-plotly==5.24.1                   # Alternative interactive charts
-tenacity==9.0.0                  # Retry logic for scraping/LLM calls
-tqdm==4.66.5
+streamlit
+streamlit-authenticator
+supabase
+openai                # Used by LangChain for OpenRouter
+langchain
+langchain-openai
+langchain-community
+unstructured[all-docs]  # Best-in-class PDF text extraction (handles Kenyan bills perfectly)
+pdf2image                # Required by unstructured for some PDFs
+pillow
+beautifulsoup4
+requests
+python-dotenv
+httpx
+pydantic
+pyarrow                  # Supabase pgvector dependency
+pgvector
+psycopg2-binary
+weasyprint                 # Beautiful PDF report generation
+altair                    # For nice charts in Streamlit
+vl-convert-python         # Required for Altair in Streamlit
+pandas
+numpy
+plotly                   # Alternative interactive charts
+tenacity                  # Retry logic for scraping/LLM calls
+tqdm
