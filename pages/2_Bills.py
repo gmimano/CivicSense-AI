@@ -119,6 +119,6 @@ for bill in bills:
                 use_container_width=True,
             ):
                 st.session_state.selected_bill = bill
-                st.switch_page("pages/3_📢 Give_Feedback.py")
+                st.switch_page("pages/3_Give_Feedback.py")
 
         st.divider()
