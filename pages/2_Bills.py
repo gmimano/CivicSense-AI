@@ -6,7 +6,9 @@ import os
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
-from corefunc.db import db  # make sure your file is core/db.py or adjust
+
+from corefunc import db
+from corefunc.llm import generate_summary
 import datetime
 
 st.set_page_config(page_title="CivicSense AI – All Bills", layout="wide")

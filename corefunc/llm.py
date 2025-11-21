@@ -6,7 +6,7 @@ import streamlit as st
 llm = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=st.secrets["OPENROUTER_API_KEY"],
-    model="google/gemini-2.0-flash-thinking-exp-001",  # fastree, cheap, excellent Kiswahili
+    model="google/gemini-2.0-flash-exp:free",  # fastree, cheap, excellent Kiswahili
     temperature=0.3,
 )
 

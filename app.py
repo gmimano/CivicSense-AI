@@ -23,4 +23,4 @@ CivicSense AI makes it easy:
 
 if st.button("Enter CivicSense AI →", type="primary", use_container_width=True):
     require_auth()  # will redirect to login if needed
-    st.switch_page("pages/Bills.py")
+    st.switch_page("pages/2_Bills.py")
