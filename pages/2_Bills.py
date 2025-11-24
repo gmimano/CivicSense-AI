@@ -67,6 +67,11 @@ with col3:
 
 st.markdown("---")
 
+# Initialize session state for dialogs
+if "show_dialog_for_bill" not in st.session_state:
+    st.session_state.show_dialog_for_bill = None
+    st.session_state.dialog_lang = None
+
 # Beautiful cards
 for bill in bills:
     with st.container():
@@ -92,25 +97,14 @@ for bill in bills:
                 "Read Full Bill (PDF)", bill["pdf_url"], use_container_width=True
             )
 
-            if st.button(
-                "Explain in Plain English",
-                key=f"eng_{bill['id']}",
-                use_container_width=True,
-            ):
-                with st.spinner("Generating simple English summary..."):
-                    summary = generate_summary(bill["full_text"], lang="English")
-                st.success("Plain English Summary")
-                st.write(summary)
+            if st.button("Explain in Plain English", key=f"eng_{bill['id']}", use_container_width=True):
+                st.session_state.show_dialog_for_bill = bill
+                st.session_state.dialog_lang = "English"
 
-            if st.button(
-                "Eleza kwa Kiswahili Rahisi",
-                key=f"swa_{bill['id']}",
-                use_container_width=True,
-            ):
-                with st.spinner("Inatafsiri na kurahisisha..."):
-                    summary = generate_summary(bill["full_text"], lang="Kiswahili")
-                st.success("Muhtasari wa Kiswahili Rahisi")
-                st.write(summary)
+            if st.button("Eleza kwa Kiswahili Rahisi", key=f"swa_{bill['id']}", use_container_width=True):
+                st.session_state.show_dialog_for_bill = bill
+                st.session_state.dialog_lang = "Kiswahili"
+
 
             if st.button(
                 "Give Feedback on This Bill →",
@@ -122,3 +116,40 @@ for bill in bills:
                 st.switch_page("pages/3_Give_Feedback.py")
 
         st.divider()
+
+# This part must be outside the main loop
+if st.session_state.show_dialog_for_bill:
+    bill = st.session_state.show_dialog_for_bill
+    lang = st.session_state.dialog_lang
+
+    title = "Plain English Summary" if lang == "English" else "Muhtasari wa Kiswahili Rahisi"
+    close_button_text = "Close" if lang == "English" else "Funga"
+
+    @st.dialog(title, width="large")
+    def show_summary_dialog():
+        st.subheader(f"Summary of: {bill['title']}")
+        with st.spinner(f"🤖 Generating {lang} summary..."):
+            try:
+                summary_text = generate_summary(bill["full_text"], lang=lang)
+                # Check if the returned text is an error message
+                if "error code" in summary_text.lower() or "failed" in summary_text.lower():
+                    print(f"An error occurred while generating summary: {summary_text}")
+                    st.error(
+                        "**Oops! We couldn't generate the summary right now.**\n\nThis can happen when our AI service is experiencing high demand. Please try again in a few minutes."
+                    )
+                else:
+                    # If it's not an error, display the summary
+                    st.markdown(summary_text)
+            except Exception as e:
+                # Log the full error to the console for debugging
+                print(f"An error occurred while generating summary: {e}")
+                # Show a user-friendly error message in the app
+                st.error(
+                    "**Oops! We couldn't generate the summary right now.**\n\nThis can happen when our AI service is experiencing high demand. Please try again in a few minutes."
+                )
+        if st.button(close_button_text):
+            st.session_state.show_dialog_for_bill = None
+            st.session_state.dialog_lang = None
+            st.rerun()
+
+    show_summary_dialog()

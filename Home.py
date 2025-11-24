@@ -5,18 +5,48 @@ from corefunc.db import supabase_client
 
 st.set_page_config(page_title="CivicSense AI • Kenya", layout="wide", initial_sidebar_state="collapsed")
 
-# Hero
+# === GLOBAL  CSS ===
 st.markdown("""
 <style>
-    .hero {background: linear-gradient(135deg, #FCDCCA 0%, #FFFFFF 100%); padding: 5rem 2rem; text-align:center; border-radius: 30px; margin-bottom: 4rem;}
-    .big-title {font-size: 5rem; font-weight: 900; background: linear-gradient(90deg, #28A745, #51D1A8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;}
-    .tagline {font-size: 2rem; color: #003366; margin: 2rem 0;}
+    /* Clean, green, mobile-first */
+    .main {background-color: #FCDCCA; padding: 1rem;}
+    .header-bar {background: linear-gradient(90deg, #28A745, #51D1A8); padding: 1rem; border-radius: 0 0 20px 20px; color: white;}
+    .nav-link {color: white !important; text-decoration: none; font-weight: bold; margin: 0 1rem; font-size: 1.1rem;}
+    .nav-link:hover {color: #FF6B00 !important;}
+    .hero {background: white; padding: 3rem; border-radius: 20px; margin: 2rem 0; box-shadow: 0 4px 20px rgba(0,0,0,0.1);}
+    .big-title {font-size: 3.5rem; color: #003366; text-align: center; margin-bottom: 1rem;}
+    .tagline {font-size: 1.5rem; color: #666666; text-align: center; margin-bottom: 2rem;}
+    .card {background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin: 1rem 0;}
+    .btn-primary {background-color: #28A745; border-radius: 25px; font-weight: bold;}
+    .metric {font-size: 2rem; color: #003366;}
+    @media (max-width: 768px) {.big-title {font-size: 2.5rem;} .header-bar {padding: 0.5rem;}}
 </style>
+""", unsafe_allow_html=True)
 
+# === HEADER NAVIGATION (st.page_link magic) ===
+def render_header():
+    st.markdown("""
+    <div class="header-bar">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; color: white;">🇰🇪 CivicSense AI</h2>
+            <div>
+                <a class="nav-link" href="/">Dashboard</a>
+                <a class="nav-link" href="/Bills">Bills</a>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+render_header()
+
+# === HERO ===
+st.markdown("""
 <div class="hero">
-    <h1 class="big-title">CivicSense AI</h1>
-    <p class="tagline">Real Kenyans shaping real laws — live</p>
-    <p style="font-size:1.4rem; color:#333;">See what thousands of citizens are saying about bills right now<br>in plain English or Kiswahili</p>
+    <h1 class="big-title">Your Voice in Parliament</h1>
+    <p class="tagline">See live sentiment on Kenyan bills • Give feedback that MPs read</p>
+    <div style="text-align: center;">
+        <button class="btn-primary stButton" onclick="window.location.href='/Bills'">Explore Bills Now</button>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -24,17 +54,3 @@ st.markdown("""
 
 # Show the full public dashboard to EVERY visitor
 show_dashboard(show_title=False)
-
-
-# Sidebar only after login
-if st.session_state.get("user"):
-    with st.sidebar:
-        st.success(f"Welcome {st.session_state.user.user_metadata.get('full_name','Citizen')}!")
-        st.page_link("app.py", label="Live Dashboard")
-        st.page_link("pages/2_Bills.py", label="All Bills")
-        st.page_link("pages/3_Give_Feedback.py", label="Give Feedback")
-        st.page_link("pages/4_Synthesis_Report.py", label="Reports")
-        st.page_link("pages/5_My_Profile.py", label="My Profile")
-        if st.button("Logout"):
-            from core.auth import logout
-            logout()
