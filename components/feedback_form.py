@@ -7,6 +7,29 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 from corefunc.db import supabase_client
 
+# --- Simple Profanity Filter ---
+# A basic list of words to check against. This is not exhaustive but covers common cases.
+# Words are in lowercase to make the check case-insensitive.
+PROFANITY_LIST = [
+    "fuck", "shit", "bitch", "cunt", "asshole", "motherfucker", "dickhead",
+    "wanker", "bastard", "pussy", "faggot", "dick", "cock",
+    # Common Kiswahili profanities (examples)
+    "kuma", "malaya", "shenzi", "mkundu", "msenge"
+]
+
+def contains_profanity(text):
+    """
+    Checks if a given text contains any words from the PROFANITY_LIST.
+    The check is case-insensitive.
+    """
+    if not text:
+        return False
+    
+    lower_text = text.lower()
+    # Check if any word from the list is a substring in the text.
+    return any(word in lower_text for word in PROFANITY_LIST)
+
+
 def show_feedback_dialog(bill):
     """
     Renders the feedback form inside a dialog for a given bill.
@@ -37,10 +60,62 @@ def show_feedback_dialog(bill):
             placeholder="E.g. In Section 14, change 'shall' to 'may' or add 'with approval from county governments'..."
         )
 
+        # Standardized list of all 47 counties for perfect map matching
+        kenyan_counties = [
+                "",
+                "MOMBASA",
+                "KWALE",
+                "KILIFI",
+                "TANA RIVER",
+                "LAMU",
+                "TAITA TAVETA",
+                "GARISSA",
+                "WAJIR",
+                "MANDERA",
+                "MARSABIT",
+                "ISIOLO",
+                "MERU",
+                "THARAKA-NITHI",
+                "EMBU",
+                "KITUI",
+                "MACHAKOS",
+                "MAKUENI",
+                "NYANDARUA",
+                "NYERI",
+                "KIRINYAGA",
+                "MURANG'A",
+                "KIAMBU",
+                "TURKANA",
+                "WEST POKOT",
+                "SAMBURU",
+                "TRANS NZOIA",
+                "UASIN GISHU",
+                "ELGEYO-MARAKWET",
+                "NANDI",
+                "BARINGO",
+                "LAIKIPIA",
+                "NAKURU",
+                "NAROK",
+                "KAJIADO",
+                "KERICHO",
+                "BOMET",
+                "KAKAMEGA",
+                "VIHIGA",
+                "BUNGOMA",
+                "BUSIA",
+                "SIAYA",
+                "KISUMU",
+                "HOMA BAY",
+                "MIGORI",
+                "KISII",
+                "NYAMIRA",
+                "NAIROBI CITY"
+            ]
+
+
         county = st.selectbox(
             "Your county (optional – helps MPs see regional views)",
-            options=["", "Nairobi", "Mombasa", "Kisumu", "Nakuru", "Kiambu", "Uasin Gishu", "Machakos",
-                     "Kakamega", "Kilifi", "Meru", "Bungoma", "Mandera", "All other counties..."]
+            options=kenyan_counties
         )
 
         submitted = st.form_submit_button("Submit My Feedback to Parliament", type="primary", use_container_width=True)
@@ -48,6 +123,11 @@ def show_feedback_dialog(bill):
         if submitted:
             if not comment.strip() and not amendment.strip():
                 st.error("Please write something in at least one field.")
+                return False
+            
+            # Profanity check
+            if contains_profanity(comment) or contains_profanity(amendment):
+                st.error("Your submission contains inappropriate language. Please revise your feedback before submitting.")
                 return False
             else:
                 data = {
