@@ -1,7 +1,7 @@
 streamlit
 streamlit-authenticator
 supabase
-openai                # Used by LangChain for OpenRouter
+openai
 langchain
 langchain-openai
 langchain-community
@@ -16,12 +16,13 @@ pydantic
 pyarrow                  # Supabase pgvector dependency
 pgvector
 psycopg2-binary
-weasyprint                 # Beautiful PDF report generation
+xhtml2pdf                  # HTML to PDF conversion (alternative to weasyprint)
 altair                    # For nice charts in Streamlit
 vl-convert-python         # Required for Altair in Streamlit
 pandas
 numpy
-plotly                   # Alternative interactive charts
+plotly                    # Alternative interactive charts
+kaleido                   # Required for Plotly static image export
 tenacity                  # Retry logic for scraping/LLM calls
 tqdm
 pymupdf

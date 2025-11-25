@@ -1,0 +1,8 @@
+# .streamlit/config.toml
+
+[theme]
+primaryColor="#0068C9" # A vibrant, friendly blue
+backgroundColor="#F0F2F6" # Very light gray for subtle background
+secondaryBackgroundColor="#FFFFFF" # White for cards, dialogs, etc.
+textColor="#31333F" # A darker, slate gray for better contrast
+font="sans serif"

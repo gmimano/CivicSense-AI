@@ -9,15 +9,33 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 from corefunc import db
 from corefunc.llm import generate_summary
+from components.feedback_form import show_feedback_dialog
+from gtts import gTTS
+from io import BytesIO
 import datetime
 
 st.set_page_config(page_title="CivicSense AI – All Bills", layout="wide")
 
-st.title("📰 Current Bills in Parliament")
-st.markdown(
-    "Real-time tracker of all National Assembly bills • Plain-language explanations • Give your input"
-)
+# === HEADER NAVIGATION (st.page_link magic) ===
+def render_header():
+    st.markdown("""
+    <div class="header-bar">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; color: white;">🇰🇪 CivicSense AI</h2>
+            <div style="display: flex; gap: 1rem;">
+                <a href="/" target="_self" class="nav-link">Home</a>
+                <a href="/Bills" target="_self" class="nav-link">Bills</a>
+                <a href="/Synthesis_Report" target="_self" class="nav-link">Reports</a>
+                <a href="/Give_Feedback" target="_self" class="nav-link">Feedback</a>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
+render_header()
+st.markdown("<h1 style='text-align:center;'>📰 Current Bills in Parliament</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; font-size:1.2rem;'>Real-time tracker of all National Assembly bills • Plain-language explanations • Give your input</p>", unsafe_allow_html=True)
+st.markdown("---")
 
 # Fetch all bills
 @st.cache_data(ttl=600)  # refresh every 10 minutes
@@ -65,12 +83,11 @@ with col2:
 with col3:
     st.metric("Latest Bill", bills[0]["title"][:40] + "..." if bills else "N/A")
 
-st.markdown("---")
-
 # Initialize session state for dialogs
 if "show_dialog_for_bill" not in st.session_state:
     st.session_state.show_dialog_for_bill = None
     st.session_state.dialog_lang = None
+    st.session_state.show_feedback_for_bill = None
 
 # Beautiful cards
 for bill in bills:
@@ -112,8 +129,7 @@ for bill in bills:
                 type="primary",
                 use_container_width=True,
             ):
-                st.session_state.selected_bill = bill
-                st.switch_page("pages/3_Give_Feedback.py")
+                st.session_state.show_feedback_for_bill = bill
 
         st.divider()
 
@@ -139,7 +155,19 @@ if st.session_state.show_dialog_for_bill:
                     )
                 else:
                     # If it's not an error, display the summary
+                    st.markdown("---")
+                    st.markdown("#### 🔊 Audio Summary")
+                    with st.spinner("Generating audio..."):
+                        # Generate audio in memory
+                        tts_lang = 'en' if lang == 'English' else 'sw'
+                        tts = gTTS(text=summary_text, lang=tts_lang, slow=False)
+                        mp3_fp = BytesIO()
+                        tts.write_to_fp(mp3_fp)
+                        mp3_fp.seek(0)
+                        st.audio(mp3_fp, format="audio/mp3")
+                    st.markdown("---")
                     st.markdown(summary_text)
+
             except Exception as e:
                 # Log the full error to the console for debugging
                 print(f"An error occurred while generating summary: {e}")
@@ -153,3 +181,16 @@ if st.session_state.show_dialog_for_bill:
             st.rerun()
 
     show_summary_dialog()
+
+# This part handles the feedback dialog
+if st.session_state.show_feedback_for_bill:
+    bill = st.session_state.show_feedback_for_bill
+
+    @st.dialog("📢 Your Voice Matters", width="large")
+    def show_feedback_form_dialog():
+        submitted = show_feedback_dialog(bill)
+        if st.button("Cancel") or submitted:
+            st.session_state.show_feedback_for_bill = None
+            st.rerun()
+
+    show_feedback_form_dialog()

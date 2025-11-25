@@ -19,8 +19,8 @@ def show_dashboard(show_title: bool = True):
     Use show_title=True on internal pages, False on the landing page (where you already have a hero).
     """
     if show_title:
-        st.markdown("<h1 style='text-align:center; color:#003366;'>Live Public Participation in Kenya</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; font-size:1.2rem; color:#666;'>Real-time citizen sentiment on bills before Parliament • Updated every minute</p>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align:center;'>Live Public Participation in Kenya</h1>", unsafe_allow_html=True) # Let theme handle color
+        st.markdown("<p style='text-align:center; font-size:1.2rem;'>Real-time citizen sentiment on bills before Parliament • Updated every minute</p>", unsafe_allow_html=True) # Let theme handle color
         st.markdown("---")
 
     # Load data
@@ -58,9 +58,9 @@ def show_dashboard(show_title: bool = True):
     st.subheader("Most Discussed Bills Right Now")
     top_bills = df['bill_title'].value_counts().head(8).reset_index()
     top_bills.columns = ['Bill', 'Submissions']
-
+    # Use a vibrant, multi-color scale
     fig_bar = px.bar(top_bills, x='Submissions', y='Bill', orientation='h',
-                     color='Submissions', color_continuous_scale='oranges',
+                     color='Submissions', color_continuous_scale='Viridis',
                      text='Submissions', height=450)
     fig_bar.update_traces(textposition='outside')
     fig_bar.update_layout(yaxis={'categoryorder': 'total ascending'}, showlegend=False)
@@ -72,18 +72,22 @@ def show_dashboard(show_title: bool = True):
     with col_left:
         st.subheader("National Sentiment")
         stance_counts = df['stance'].value_counts()
+        # Use a new, colorful and distinct palette
         fig_pie = px.pie(values=stance_counts.values, names=stance_counts.index, hole=0.45,
-                         color_discrete_map={'Support':'#28A745', 'Oppose':'#BA2F00', 'Neutral':'#6A66D0'})
+                         color_discrete_map={'Support':'#28A745',  # A clear green for support
+                                             'Oppose':'#DC3545',   # A clear red for oppose
+                                             'Neutral':'#FFC107'   # A warm yellow for neutral
+                                            })
         fig_pie.update_traces(textposition='inside', textinfo='percent+label')
         st.plotly_chart(fig_pie, use_container_width=True)
 
     with col_right:
         st.subheader("Participation by County")
         if 'county' in df.columns and df['county'].notna().any():
-            county_data = df['county'].value_counts().head(10).reset_index()
+            county_data = df['county'].value_counts().head(10).reset_index() # Use a green continuous scale
             county_data.columns = ['County', 'Submissions']
-            fig_county = px.bar(county_data, x='Submissions', y='County', orientation='h',
-                                color='Submissions', color_continuous_scale='purples')
+            fig_county = px.bar(county_data, x='Submissions', y='County', orientation='h', # Use a blue scale to match primary color
+                                color='Submissions', color_continuous_scale='Blues')
             st.plotly_chart(fig_county, use_container_width=True)
         else:
             st.info("County participation will appear here as people submit")
@@ -94,8 +98,8 @@ def show_dashboard(show_title: bool = True):
     df['date'] = pd.to_datetime(df['created_at']).dt.date
     trend = df['date'].value_counts().sort_index().reset_index()
     trend.columns = ['Date', 'Submissions']
-
-    fig_line = px.area(trend, x='Date', y='Submissions', color_discrete_sequence=['#51D1A8'])
+    # Use the primary blue for the trend line
+    fig_line = px.area(trend, x='Date', y='Submissions', color_discrete_sequence=['#0068C9'])
     st.plotly_chart(fig_line, use_container_width=True)
 
     if not show_title:
