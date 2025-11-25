@@ -17,16 +17,22 @@ st.title("📊 Public Participation Synthesis Report")
 st.markdown("Professional report ready for the Clerk of the National Assembly — generated in seconds.")
 
 # Load bills
-bills_result = supabase_client.table("bills").select("id,title").order("published_at", desc=True).execute()
+bills_result = supabase_client.table("bills").select("id, title, report_summary").order("published_at", desc=True).execute()
 bills = bills_result.data
 
 if not bills:
     st.warning("No bills in the database yet. Run the scraper first.")
     st.stop()
 
-bill_titles = [b["title"] for b in bills]
-selected_title = st.selectbox("Select bill for report", bill_titles)
-bill_id = next(b["id"] for b in bills if b["title"] == selected_title)
+bill_options = {b["title"]: b for b in bills}
+selected_title = st.selectbox("Select bill for report", bill_options.keys())
+
+selected_bill = bill_options[selected_title]
+bill_id = selected_bill["id"]
+
+# Check if a summary already exists and inform the user
+if selected_bill.get("report_summary"):
+    st.info("An AI-generated executive summary for this bill already exists and will be used in the report.")
 
 if st.button("Generate Official Report →", type="primary", use_container_width=True):
     feedbacks_result = supabase_client.table("feedback").select("*").eq("bill_id", bill_id).execute()
@@ -64,31 +70,37 @@ if st.button("Generate Official Report →", type="primary", use_container_width
         if f.get("suggested_amendment"):
             comments += f"   ↳ Suggestion: {f['suggested_amendment'].strip()}\n"
 
-    # AI Executive Summary
-    with st.spinner("AI drafting executive summary..."):
-        try:
-            from corefunc.llm import llm
-            prompt = f"""
-You are the Clerk of the National Assembly preparing the official Article 118 public participation report.
+    # AI Executive Summary: Check cache first
+    ai_summary = selected_bill.get("report_summary")
+    if not ai_summary:
+        with st.spinner("AI drafting executive summary... (This will be saved for future reports)"):
+            try:
+                from corefunc.llm import llm
+                prompt = f"""
+    You are the Clerk of the National Assembly preparing the official Article 118 public participation report.
 
-Bill: {selected_title}
+    Bill: {selected_title}
 
-Participation Statistics:
-• Total submissions: {total}
-• Support: {support} ({support/total*100:.1f}%)
-• Oppose: {oppose} ({oppose/total*100:.1f}%)
-• Neutral: {neutral} ({neutral/total*100:.1f}%)
+    Participation Statistics:
+    • Total submissions: {total}
+    • Support: {support} ({support/total*100:.1f}%)
+    • Oppose: {oppose} ({oppose/total*100:.1f}%)
+    • Neutral: {neutral} ({neutral/total*100:.1f}%)
 
-Citizen voices:
-{comments}
+    Citizen voices:
+    {comments}
 
-Write a neutral, formal executive summary (250–350 words) in parliamentary language, followed by the top 5 most common concerns or suggested amendments as numbered points.
-"""
-            response = llm.invoke(prompt)
-            ai_summary = response.content.strip()
-        except Exception as e:
-            st.error("AI summary failed — using basic version.")
-            ai_summary = f"{total} submissions received ({support} support, {oppose} oppose, {neutral} neutral). Full feedback attached below."
+    Write a neutral, formal executive summary (250–350 words) in parliamentary language, followed by the top 5 most common concerns or suggested amendments as numbered points.
+    """
+                response = llm.invoke(prompt)
+                ai_summary = response.content.strip()
+                # Save the newly generated summary to the database
+                supabase_client.table("bills").update({"report_summary": ai_summary}).eq("id", bill_id).execute()
+            except Exception as e:
+                st.error(f"AI summary failed: {e}")
+                ai_summary = f"{total} submissions received ({support} support, {oppose} oppose, {neutral} neutral). Full feedback attached below."
+    else:
+        st.success("Loaded existing AI executive summary.")
 
     # Generate PDF with WeasyPrint
     with st.spinner("Assembling final PDF report..."):

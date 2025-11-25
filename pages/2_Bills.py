@@ -8,7 +8,6 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 from corefunc import db
-from corefunc.llm import generate_summary
 from components.feedback_form import show_feedback_dialog
 from gtts import gTTS
 from io import BytesIO
@@ -144,37 +143,52 @@ if st.session_state.show_dialog_for_bill:
     @st.dialog(title, width="large")
     def show_summary_dialog():
         st.subheader(f"Summary of: {bill['title']}")
-        with st.spinner(f"🤖 Generating {lang} summary..."):
-            try:
-                summary_text = generate_summary(bill["full_text"], lang=lang)
-                # Check if the returned text is an error message
-                if "error code" in summary_text.lower() or "failed" in summary_text.lower():
-                    print(f"An error occurred while generating summary: {summary_text}")
+        
+        db_column = "summary_en" if lang == "English" else "summary_sw"
+        summary_text = bill.get(db_column)
+
+        if not summary_text:
+            with st.spinner(f"🤖 Generating {lang} summary... (This will be saved for future use)"):
+                try:
+                    # We need to import the LLM function here
+                    from corefunc.llm import llm 
+                    prompt = f"""
+                    You are a policy analyst. Summarize the following bill text in simple, clear {lang} (around 150-200 words).
+                    Explain its main purpose and who it will affect.
+
+                    Bill Title: {bill['title']}
+                    Bill Text:
+                    {bill['full_text'][:15000]}
+                    """
+                    response = llm.invoke(prompt)
+                    summary_text = response.content.strip()
+
+                    # Save the newly generated summary to the database
+                    db.supabase_client.table("bills").update({db_column: summary_text}).eq("id", bill['id']).execute()
+                    st.success("Summary generated and saved!")
+
+                except Exception as e:
+                    print(f"An error occurred while generating summary: {e}")
                     st.error(
                         "**Oops! We couldn't generate the summary right now.**\n\nThis can happen when our AI service is experiencing high demand. Please try again in a few minutes."
                     )
-                else:
-                    # If it's not an error, display the summary
-                    st.markdown("---")
-                    st.markdown("#### 🔊 Audio Summary")
-                    with st.spinner("Generating audio..."):
-                        # Generate audio in memory
-                        tts_lang = 'en' if lang == 'English' else 'sw'
-                        tts = gTTS(text=summary_text, lang=tts_lang, slow=False)
-                        mp3_fp = BytesIO()
-                        tts.write_to_fp(mp3_fp)
-                        mp3_fp.seek(0)
-                        st.audio(mp3_fp, format="audio/mp3")
-                    st.markdown("---")
-                    st.markdown(summary_text)
+                    st.stop()
+        else:
+            st.success("Loaded existing summary.")
 
-            except Exception as e:
-                # Log the full error to the console for debugging
-                print(f"An error occurred while generating summary: {e}")
-                # Show a user-friendly error message in the app
-                st.error(
-                    "**Oops! We couldn't generate the summary right now.**\n\nThis can happen when our AI service is experiencing high demand. Please try again in a few minutes."
-                )
+        # Display the summary and audio
+        st.markdown("---")
+        st.markdown("#### 🔊 Audio Summary")
+        with st.spinner("Generating audio..."):
+            tts_lang = 'en' if lang == 'English' else 'sw'
+            tts = gTTS(text=summary_text, lang=tts_lang, slow=False)
+            mp3_fp = BytesIO()
+            tts.write_to_fp(mp3_fp)
+            mp3_fp.seek(0)
+            st.audio(mp3_fp, format="audio/mp3")
+        st.markdown("---")
+        st.markdown(summary_text)
+
         if st.button(close_button_text):
             st.session_state.show_dialog_for_bill = None
             st.session_state.dialog_lang = None
