@@ -32,6 +32,8 @@ import datetime
 
 st.set_page_config(page_title="CivicSense AI – All Bills", layout="wide")
 
+# Wrap the entire page content in a spinner to show a loading state from the very beginning
+with st.spinner("Loading Bills page... Please wait."):
 # === GLOBAL  CSS ===
 st.markdown("""
 <style>
@@ -83,8 +85,7 @@ def load_bills():
     return result.data
 
 
-with st.spinner("Fetching latest bills from Parliament..."):
-    bills = load_bills()
+    bills = load_bills() # The data loading is now covered by the outer spinner
 if not bills:
     st.info("No bills found yet. Run the scraper first!")
     st.stop()
