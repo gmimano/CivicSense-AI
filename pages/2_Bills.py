@@ -9,11 +9,46 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 from corefunc import db
 from components.feedback_form import show_feedback_dialog
-from gtts import gTTS
-from io import BytesIO
+# Conditional import for LLM chain components with error handling
+# The user has identified the correct import for PromptTemplate.
+try:
+    from gtts import gTTS
+    from io import BytesIO
+    # Removed the problematic 'from langchain.chains.summarize import load_summarize_chain'
+    # The map-reduce logic will be built explicitly using LCEL components.
+except ModuleNotFoundError:
+    st.error("Error: Required AI modules (like 'langchain.chains') were not found.")
+    st.markdown("""
+        This usually means the `langchain` library or its components are not correctly installed. Please ensure your virtual environment is activated and run: `pip install --upgrade -r requirements.txt`
+        Then, restart your Streamlit application.
+    """)
+    st.stop()
+
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnableMap, RunnablePassthrough
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 import datetime
 
 st.set_page_config(page_title="CivicSense AI – All Bills", layout="wide")
+
+# === GLOBAL  CSS ===
+st.markdown("""
+<style>
+    /* Customizations to complement the global theme */
+    .main {padding: 1rem;}
+    .header-bar {background: linear-gradient(90deg, #0068C9, #007FFF); padding: 1rem; border-radius: 0 0 15px 15px; color: white;} /* New blue gradient */
+    .nav-link {color: white !important; text-decoration: none; font-weight: bold; margin: 0 1rem; font-size: 1.1rem;}
+    .nav-link:hover {color: #FFD700 !important;} /* A bright yellow for hover accent */
+    .hero {background: white; padding: 3rem; border-radius: 15px; margin: 2rem 0; box-shadow: 0 4px 20px rgba(0,0,0,0.05);}
+    .big-title {font-size: 3.5rem; color: #31333F; text-align: center; margin-bottom: 1rem;} /* Use new textColor */
+    .tagline {font-size: 1.5rem; color: #666666; text-align: center; margin-bottom: 2rem;}
+    /* .stButton>button will now be styled by the theme's primaryColor */
+    .stButton>button {border-radius: 25px !important; font-weight: bold !important;}
+    .metric {font-size: 2rem; color: #0068C9;} /* Use new primaryColor */
+    @media (max-width: 768px) {.big-title {font-size: 2.5rem;} .header-bar {padding: 0.5rem;}}
+</style>
+""", unsafe_allow_html=True)
 
 # === HEADER NAVIGATION (st.page_link magic) ===
 def render_header():
@@ -25,7 +60,7 @@ def render_header():
                 <a href="/" target="_self" class="nav-link">Home</a>
                 <a href="/Bills" target="_self" class="nav-link">Bills</a>
                 <a href="/Synthesis_Report" target="_self" class="nav-link">Reports</a>
-                <a href="/Give_Feedback" target="_self" class="nav-link">Feedback</a>
+                <a href="#" target="_self" class="nav-link">About</a>
             </div>
         </div>
     </div>
@@ -48,8 +83,8 @@ def load_bills():
     return result.data
 
 
-bills = load_bills()
-
+with st.spinner("Fetching latest bills from Parliament..."):
+    bills = load_bills()
 if not bills:
     st.info("No bills found yet. Run the scraper first!")
     st.stop()
@@ -150,18 +185,39 @@ if st.session_state.show_dialog_for_bill:
         if not summary_text:
             with st.spinner(f"🤖 Generating {lang} summary... (This will be saved for future use)"):
                 try:
-                    # We need to import the LLM function here
-                    from corefunc.llm import llm 
-                    prompt = f"""
-                    You are a policy analyst. Summarize the following bill text in simple, clear {lang} (around 150-200 words).
-                    Explain its main purpose and who it will affect.
+                    from corefunc.llm import llm # Ensure LLM is imported here
 
-                    Bill Title: {bill['title']}
-                    Bill Text:
-                    {bill['full_text'][:15000]}
+                    # 1. Split the document into smaller, manageable chunks
+                    text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
+                    docs = [Document(page_content=t) for t in text_splitter.split_text(bill['full_text'])]
+
+                    # 2. Define the "Map" prompt for summarizing individual chunks
+                    map_prompt_template = f"""
+                    You are a policy analyst. Summarize the following chunk of a Kenyan parliamentary bill in simple, clear {lang}.
+                    Focus on the main purpose, key actions, and who it will affect.
+                    Text: "{{page_content}}"
+                    CONCISE SUMMARY:
                     """
-                    response = llm.invoke(prompt)
-                    summary_text = response.content.strip()
+                    map_prompt = PromptTemplate.from_template(map_prompt_template)
+                    map_chain = {"page_content": RunnablePassthrough()} | map_prompt | llm
+
+                    # Execute the map step: summarize each chunk
+                    # The .batch() method is efficient for processing multiple inputs
+                    chunk_summaries_raw = map_chain.batch(docs)
+                    chunk_summaries = [s.content for s in chunk_summaries_raw]
+                    combined_chunk_summaries = "\n\n".join(chunk_summaries)
+
+                    # 3. Define the "Reduce" prompt for combining chunk summaries into a final summary
+                    reduce_prompt_template = f"""
+                    You are a policy analyst. Combine the following concise summaries of sections of a Kenyan parliamentary bill into a single, coherent, and comprehensive executive summary (around 200-250 words) in {lang}.
+                    Explain the bill's overall main purpose and who it will affect.
+                    Summaries of sections:
+                    {{combined_chunk_summaries}}
+                    FINAL EXECUTIVE SUMMARY:
+                    """
+                    reduce_prompt = PromptTemplate.from_template(reduce_prompt_template)
+                    reduce_chain = {"combined_chunk_summaries": RunnablePassthrough()} | reduce_prompt | llm
+                    summary_text = reduce_chain.invoke(combined_chunk_summaries).content.strip()
 
                     # Save the newly generated summary to the database
                     db.supabase_client.table("bills").update({db_column: summary_text}).eq("id", bill['id']).execute()

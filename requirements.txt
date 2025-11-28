@@ -4,6 +4,7 @@ supabase
 openai
 langchain
 langchain-openai
+langchain-text-splitters # Added for RecursiveCharacterTextSplitter
 langchain-community
 unstructured[all-docs]  # Best-in-class PDF text extraction (handles Kenyan bills perfectly)
 pdf2image                # Required by unstructured for some PDFs

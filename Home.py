@@ -37,7 +37,7 @@ def render_header():
                 <a href="/" target="_self" class="nav-link">Home</a>
                 <a href="/Bills" target="_self" class="nav-link">Bills</a>
                 <a href="/Synthesis_Report" target="_self" class="nav-link">Reports</a>
-                <a href="/Give_Feedback" target="_self" class="nav-link">Feedback</a>
+                <a href="#/" target="_self" class="nav-link">About</a>
             </div>
         </div>
     </div>
@@ -141,23 +141,24 @@ else:
             st.plotly_chart(fig_bar, use_container_width=True)
 
         with chart_cols[1]:
-            st.markdown("#### Geographic Participation")
-            county_counts = filtered_df['county'].value_counts().reset_index()
-            county_counts.columns = ['county', 'submissions']
-            county_counts['county'] = county_counts['county'].str.title() # Convert to Title Case for GeoJSON matching
+            with st.spinner("Loading participation map..."):
+                st.markdown("#### Geographic Participation")
+                county_counts = filtered_df['county'].value_counts().reset_index()
+                county_counts.columns = ['county', 'submissions']
+                county_counts['county'] = county_counts['county'].str.title() # Convert to Title Case for GeoJSON matching
 
-            # Construct an absolute path to the geojson file
-            geojson_path = os.path.join(os.path.dirname(__file__), 'corefunc', 'kenya-counties.geojson')
-            with open(geojson_path) as f:
-                counties_geojson = json.load(f)
+                # Construct an absolute path to the geojson file
+                geojson_path = os.path.join(os.path.dirname(__file__), 'corefunc', 'kenya-counties.geojson')
+                with open(geojson_path) as f:
+                    counties_geojson = json.load(f)
 
-            # Use the county name for color to get a discrete, colorful map
-            fig_map = px.choropleth_mapbox(county_counts, geojson=counties_geojson, locations='county', featureidkey="properties.COUNTY",
-                                           color='county', # Changed from 'submissions'
-                                           mapbox_style="carto-positron", zoom=4.5, center={"lat": 0.0236, "lon": 37.9062},
-                                           opacity=0.7, labels={'county':'County'})
-            fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-            st.plotly_chart(fig_map, use_container_width=True)
+                # Use the county name for color to get a discrete, colorful map
+                fig_map = px.choropleth_mapbox(county_counts, geojson=counties_geojson, locations='county', featureidkey="properties.COUNTY",
+                                               color='county', # Changed from 'submissions'
+                                               mapbox_style="carto-positron", zoom=4.5, center={"lat": 0.0236, "lon": 37.9062},
+                                               opacity=0.7, labels={'county':'County'})
+                fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+                st.plotly_chart(fig_map, use_container_width=True)
 
     else:  # A specific bill is selected
         # Calculate metrics for the selected bill
@@ -196,24 +197,25 @@ else:
             st.plotly_chart(fig_area, use_container_width=True)
 
         st.markdown("---")
-        st.markdown("#### Geographic Participation")
-        # Filter out rows where county is not specified
-        county_df = filtered_df.dropna(subset=['county'])
-        if not county_df.empty:
-            county_counts = county_df['county'].value_counts().reset_index()
-            county_counts.columns = ['county', 'submissions']
-            county_counts['county'] = county_counts['county'].str.title() # Convert to Title Case for GeoJSON matching
+        with st.spinner("Loading participation map..."):
+            st.markdown("#### Geographic Participation")
+            # Filter out rows where county is not specified
+            county_df = filtered_df.dropna(subset=['county'])
+            if not county_df.empty:
+                county_counts = county_df['county'].value_counts().reset_index()
+                county_counts.columns = ['county', 'submissions']
+                county_counts['county'] = county_counts['county'].str.title() # Convert to Title Case for GeoJSON matching
 
-            geojson_path = os.path.join(os.path.dirname(__file__), 'corefunc', 'kenya-counties.geojson')
-            with open(geojson_path) as f:
-                counties_geojson = json.load(f)
+                geojson_path = os.path.join(os.path.dirname(__file__), 'corefunc', 'kenya-counties.geojson')
+                with open(geojson_path) as f:
+                    counties_geojson = json.load(f)
 
-            # Use the county name for color to get a discrete, colorful map
-            fig_map = px.choropleth_mapbox(county_counts, geojson=counties_geojson, locations='county', featureidkey="properties.COUNTY",
-                                           color='county', # Changed from 'submissions'
-                                           mapbox_style="carto-positron", zoom=4.5, center={"lat": 0.0236, "lon": 37.9062},
-                                           opacity=0.7, labels={'county':'County'})
-            fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-            st.plotly_chart(fig_map, use_container_width=True)
-        else:
-            st.info("No county-specific feedback has been submitted for this bill yet.")
+                # Use the county name for color to get a discrete, colorful map
+                fig_map = px.choropleth_mapbox(county_counts, geojson=counties_geojson, locations='county', featureidkey="properties.COUNTY",
+                                               color='county', # Changed from 'submissions'
+                                               mapbox_style="carto-positron", zoom=4.5, center={"lat": 0.0236, "lon": 37.9062},
+                                               opacity=0.7, labels={'county':'County'})
+                fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+                st.plotly_chart(fig_map, use_container_width=True)
+            else:
+                st.info("No county-specific feedback has been submitted for this bill yet.")

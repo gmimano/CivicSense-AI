@@ -11,28 +11,71 @@ import os
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 from corefunc.db import supabase_client
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnablePassthrough
 
 
 st.title("📊 Public Participation Synthesis Report")
+
+# === GLOBAL  CSS ===
+st.markdown("""
+<style>
+    /* Customizations to complement the global theme */
+    .main {padding: 1rem;}
+    .header-bar {background: linear-gradient(90deg, #0068C9, #007FFF); padding: 1rem; border-radius: 0 0 15px 15px; color: white;} /* New blue gradient */
+    .nav-link {color: white !important; text-decoration: none; font-weight: bold; margin: 0 1rem; font-size: 1.1rem;}
+    .nav-link:hover {color: #FFD700 !important;} /* A bright yellow for hover accent */
+    .hero {background: white; padding: 3rem; border-radius: 15px; margin: 2rem 0; box-shadow: 0 4px 20px rgba(0,0,0,0.05);}
+    .big-title {font-size: 3.5rem; color: #31333F; text-align: center; margin-bottom: 1rem;} /* Use new textColor */
+    .tagline {font-size: 1.5rem; color: #666666; text-align: center; margin-bottom: 2rem;}
+    /* .stButton>button will now be styled by the theme's primaryColor */
+    .stButton>button {border-radius: 25px !important; font-weight: bold !important;}
+    .metric {font-size: 2rem; color: #0068C9;} /* Use new primaryColor */
+    @media (max-width: 768px) {.big-title {font-size: 2.5rem;} .header-bar {padding: 0.5rem;}}
+</style>
+""", unsafe_allow_html=True)
+
+# === HEADER NAVIGATION (st.page_link magic) ===
+def render_header():
+    st.markdown("""
+    <div class="header-bar">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; color: white;">🇰🇪 CivicSense AI</h2>
+            <div style="display: flex; gap: 1rem;">
+                <a href="/" target="_self" class="nav-link">Home</a>
+                <a href="/Bills" target="_self" class="nav-link">Bills</a>
+                <a href="/Synthesis_Report" target="_self" class="nav-link">Reports</a>
+                <a href="#" target="_self" class="nav-link">About</a>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+render_header()
+
 st.markdown("Professional report ready for the Clerk of the National Assembly — generated in seconds.")
 
-# Load bills
-bills_result = supabase_client.table("bills").select("id, title, report_summary").order("published_at", desc=True).execute()
-bills = bills_result.data
+# Load only bills that have feedback
+@st.cache_data(ttl=300) # Cache for 5 minutes
+def load_bills_with_feedback():
+    # 1. Get unique bill_ids from the feedback table
+    feedback_bills_result = supabase_client.table("feedback").select("bill_id").execute()
+    if not feedback_bills_result.data:
+        return []
+    bill_ids_with_feedback = list(set(item['bill_id'] for item in feedback_bills_result.data))
+    
+    # 2. Fetch the details of those bills
+    bills_result = supabase_client.table("bills").select("id,title").in_("id", bill_ids_with_feedback).order("published_at", desc=True).execute()
+    return bills_result.data
 
-if not bills:
-    st.warning("No bills in the database yet. Run the scraper first.")
+bills_with_feedback = load_bills_with_feedback()
+if not bills_with_feedback:
+    st.info("No public feedback has been submitted for any bill yet. The list will populate once feedback is received.")
     st.stop()
 
-bill_options = {b["title"]: b for b in bills}
-selected_title = st.selectbox("Select bill for report", bill_options.keys())
-
-selected_bill = bill_options[selected_title]
-bill_id = selected_bill["id"]
-
-# Check if a summary already exists and inform the user
-if selected_bill.get("report_summary"):
-    st.info("An AI-generated executive summary for this bill already exists and will be used in the report.")
+bill_titles = [b["title"] for b in bills_with_feedback]
+selected_title = st.selectbox("Select bill for report", bill_titles)
+bill_id = next(b["id"] for b in bills_with_feedback if b["title"] == selected_title)
 
 if st.button("Generate Official Report →", type="primary", use_container_width=True):
     feedbacks_result = supabase_client.table("feedback").select("*").eq("bill_id", bill_id).execute()
@@ -62,45 +105,68 @@ if st.button("Generate Official Report →", type="primary", use_container_width
 
 
     # Build clean comment block for AI
-    comments = ""
+    # Format each feedback into a string
+    feedback_strings = []
     for f in feedbacks:
+        entry = f"• Stance: {f['stance']}, County: {f.get('county') or 'N/A'}\n"
         if f["comment"]:
-            county = f.get("county") or "Kenya"
-            comments += f"• {f['stance']} ({county}): {f['comment'].strip()}\n"
+            entry += f"  Comment: {f['comment'].strip()}\n"
         if f.get("suggested_amendment"):
-            comments += f"   ↳ Suggestion: {f['suggested_amendment'].strip()}\n"
+            entry += f"  Suggestion: {f['suggested_amendment'].strip()}\n"
+        feedback_strings.append(entry)
 
-    # AI Executive Summary: Check cache first
-    ai_summary = selected_bill.get("report_summary")
-    if not ai_summary:
-        with st.spinner("AI drafting executive summary... (This will be saved for future reports)"):
-            try:
-                from corefunc.llm import llm
-                prompt = f"""
-    You are the Clerk of the National Assembly preparing the official Article 118 public participation report.
+    # Group feedback into chunks of 10 to avoid overwhelming the LLM
+    chunk_size = 10
+    feedback_chunks = ["\n".join(feedback_strings[i:i + chunk_size]) for i in range(0, len(feedback_strings), chunk_size)]
 
-    Bill: {selected_title}
+    # AI Executive Summary
+    with st.spinner("AI drafting executive summary..."):
+        try:
+            from corefunc.llm import llm
 
-    Participation Statistics:
-    • Total submissions: {total}
-    • Support: {support} ({support/total*100:.1f}%)
-    • Oppose: {oppose} ({oppose/total*100:.1f}%)
-    • Neutral: {neutral} ({neutral/total*100:.1f}%)
+            # 1. Map step: Summarize each chunk of feedback
+            map_prompt_template = """
+            You are a policy analyst. The following are citizen submissions for a parliamentary bill.
+            Summarize the key themes, arguments, and specific suggestions in this chunk of feedback.
+            
+            Feedback chunk:
+            "{text}"
+            
+            CONCISE SUMMARY OF THEMES:
+            """
+            map_prompt = PromptTemplate.from_template(map_prompt_template)
+            map_chain = {"text": RunnablePassthrough()} | map_prompt | llm
+            
+            # Run map chain on all chunks
+            chunk_summaries_raw = map_chain.batch(feedback_chunks)
+            intermediate_summaries = "\n\n---\n\n".join([s.content for s in chunk_summaries_raw])
 
-    Citizen voices:
-    {comments}
+            # 2. Reduce step: Combine the summaries into a final report
+            reduce_prompt_template = f"""
+            You are the Clerk of the National Assembly preparing the official Article 118 public participation report for the "{selected_title}" bill.
+            You have been provided with several summaries of citizen feedback. Your task is to synthesize these into a single, formal executive report.
 
-    Write a neutral, formal executive summary (250–350 words) in parliamentary language, followed by the top 5 most common concerns or suggested amendments as numbered points.
-    """
-                response = llm.invoke(prompt)
-                ai_summary = response.content.strip()
-                # Save the newly generated summary to the database
-                supabase_client.table("bills").update({"report_summary": ai_summary}).eq("id", bill_id).execute()
-            except Exception as e:
-                st.error(f"AI summary failed: {e}")
-                ai_summary = f"{total} submissions received ({support} support, {oppose} oppose, {neutral} neutral). Full feedback attached below."
-    else:
-        st.success("Loaded existing AI executive summary.")
+            Start with the overall participation statistics:
+            - Total submissions: {total}
+            - Support: {support} ({support/total*100:.1f}%)
+            - Oppose: {oppose} ({oppose/total*100:.1f}%)
+            - Neutral: {neutral} ({neutral/total*100:.1f}%)
+
+            Synthesized summaries of citizen feedback:
+            {{chunk_summaries}}
+
+            Based on all the information above, write a neutral, formal executive summary (250–350 words) in parliamentary language.
+            After the summary, list the top 5 most common concerns or suggested amendments as clear, numbered points.
+            """
+            reduce_prompt = PromptTemplate.from_template(reduce_prompt_template)
+            reduce_chain = {"chunk_summaries": RunnablePassthrough()} | reduce_prompt | llm
+            
+            ai_summary = reduce_chain.invoke(intermediate_summaries).content.strip()
+
+        except Exception as e:
+            st.error("AI summary failed. See error details below.")
+            st.exception(e) # This will print the full stack trace
+            ai_summary = f"{total} submissions received ({support} support, {oppose} oppose, {neutral} neutral). Full feedback attached below."
 
     # Generate PDF with WeasyPrint
     with st.spinner("Assembling final PDF report..."):
@@ -181,8 +247,8 @@ if st.button("Generate Official Report →", type="primary", use_container_width
         # or ensure it's referenced correctly. Here, we'll embed it.
         css_string = """
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
-        body { font-family: 'Roboto', sans-serif; color: #333; }
-        h1, h2, h3 { color: #0068C9; }
+        body { font-family: 'Roboto', sans-serif; color: #333; font-weight: 400; }
+        h1, h2, h3 { color: #0068C9; font-weight: 700; }
         /* xhtml2pdf does not support fixed positioning for header/footer as well as WeasyPrint.
            For simple page numbers, you might need to use @page rules or a custom callback,
            but for this example, we'll keep the CSS as is, knowing it might render differently. */
