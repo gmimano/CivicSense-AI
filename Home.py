@@ -161,61 +161,62 @@ else:
                 st.plotly_chart(fig_map, use_container_width=True)
 
     else:  # A specific bill is selected
-        # Calculate metrics for the selected bill
-        total_submissions = len(filtered_df)
-        stance_counts = filtered_df['stance'].value_counts()
+        with st.spinner(f"Loading dashboard for '{selected_bill}'... Please wait for the page to refresh."):
+            # Calculate metrics for the selected bill
+            total_submissions = len(filtered_df)
+            stance_counts = filtered_df['stance'].value_counts()
 
-        support_count = stance_counts.get('Support', 0)
-        oppose_count = stance_counts.get('Oppose', 0)
+            support_count = stance_counts.get('Support', 0)
+            oppose_count = stance_counts.get('Oppose', 0)
 
-        support_rate = (support_count / total_submissions * 100) if total_submissions > 0 else 0
-        oppose_rate = (oppose_count / total_submissions * 100) if total_submissions > 0 else 0
+            support_rate = (support_count / total_submissions * 100) if total_submissions > 0 else 0
+            oppose_rate = (oppose_count / total_submissions * 100) if total_submissions > 0 else 0
 
-        kpi_cols[0].metric("Total Submissions", f"{total_submissions:,}")
-        kpi_cols[1].metric("Support Rate", f"{support_rate:.1f}%")
-        kpi_cols[2].metric("Oppose Rate", f"{oppose_rate:.1f}%")
+            kpi_cols[0].metric("Total Submissions", f"{total_submissions:,}")
+            kpi_cols[1].metric("Support Rate", f"{support_rate:.1f}%")
+            kpi_cols[2].metric("Oppose Rate", f"{oppose_rate:.1f}%")
 
-        # --- SINGLE BILL CHARTS ---
-        st.markdown("---")
-        st.subheader(f"Analysis for: {selected_bill}")
-        chart_cols = st.columns(2)
+            # --- SINGLE BILL CHARTS ---
+            st.markdown("---")
+            st.subheader(f"Analysis for: {selected_bill}")
+            chart_cols = st.columns(2)
 
-        with chart_cols[0]:
-            st.markdown("#### Sentiment Breakdown")
-            fig_donut = px.pie(stance_counts, values=stance_counts.values, names=stance_counts.index, hole=0.4,
-                               color=stance_counts.index,
-                               color_discrete_map={'Support':'#28a745', 'Oppose':'#dc3545', 'Neutral':'#ffc107'})
-            fig_donut.update_traces(textposition='inside', textinfo='percent+label')
-            fig_donut.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0), font_color='#31333F')
-            st.plotly_chart(fig_donut, use_container_width=True)
+            with chart_cols[0]:
+                st.markdown("#### Sentiment Breakdown")
+                fig_donut = px.pie(stance_counts, values=stance_counts.values, names=stance_counts.index, hole=0.4,
+                                   color=stance_counts.index,
+                                   color_discrete_map={'Support':'#28a745', 'Oppose':'#dc3545', 'Neutral':'#ffc107'})
+                fig_donut.update_traces(textposition='inside', textinfo='percent+label')
+                fig_donut.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0), font_color='#31333F')
+                st.plotly_chart(fig_donut, use_container_width=True)
 
-        with chart_cols[1]:
-            st.markdown("#### Feedback Volume Over Time")
-            daily_counts = filtered_df.set_index('created_at').resample('D').size().reset_index(name='submissions')
-            fig_area = px.area(daily_counts, x='created_at', y='submissions', labels={'created_at': 'Date', 'submissions': 'Submissions'})
-            fig_area.update_layout(margin=dict(t=20, b=0, l=0, r=0), yaxis_title=None, xaxis_title=None)
-            st.plotly_chart(fig_area, use_container_width=True)
+            with chart_cols[1]:
+                st.markdown("#### Feedback Volume Over Time")
+                daily_counts = filtered_df.set_index('created_at').resample('D').size().reset_index(name='submissions')
+                fig_area = px.area(daily_counts, x='created_at', y='submissions', labels={'created_at': 'Date', 'submissions': 'Submissions'})
+                fig_area.update_layout(margin=dict(t=20, b=0, l=0, r=0), yaxis_title=None, xaxis_title=None)
+                st.plotly_chart(fig_area, use_container_width=True)
 
-        st.markdown("---")
-        with st.spinner("Loading participation map..."):
-            st.markdown("#### Geographic Participation")
-            # Filter out rows where county is not specified
-            county_df = filtered_df.dropna(subset=['county'])
-            if not county_df.empty:
-                county_counts = county_df['county'].value_counts().reset_index()
-                county_counts.columns = ['county', 'submissions']
-                county_counts['county'] = county_counts['county'].str.title() # Convert to Title Case for GeoJSON matching
+            st.markdown("---")
+            with st.spinner("Loading participation map..."):
+                st.markdown("#### Geographic Participation")
+                # Filter out rows where county is not specified
+                county_df = filtered_df.dropna(subset=['county'])
+                if not county_df.empty:
+                    county_counts = county_df['county'].value_counts().reset_index()
+                    county_counts.columns = ['county', 'submissions']
+                    county_counts['county'] = county_counts['county'].str.title() # Convert to Title Case for GeoJSON matching
 
-                geojson_path = os.path.join(os.path.dirname(__file__), 'corefunc', 'kenya-counties.geojson')
-                with open(geojson_path) as f:
-                    counties_geojson = json.load(f)
+                    geojson_path = os.path.join(os.path.dirname(__file__), 'corefunc', 'kenya-counties.geojson')
+                    with open(geojson_path) as f:
+                        counties_geojson = json.load(f)
 
-                # Use the county name for color to get a discrete, colorful map
-                fig_map = px.choropleth_mapbox(county_counts, geojson=counties_geojson, locations='county', featureidkey="properties.COUNTY",
-                                               color='county', # Changed from 'submissions'
-                                               mapbox_style="carto-positron", zoom=4.5, center={"lat": 0.0236, "lon": 37.9062},
-                                               opacity=0.7, labels={'county':'County'})
-                fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-                st.plotly_chart(fig_map, use_container_width=True)
-            else:
-                st.info("No county-specific feedback has been submitted for this bill yet.")
+                    # Use the county name for color to get a discrete, colorful map
+                    fig_map = px.choropleth_mapbox(county_counts, geojson=counties_geojson, locations='county', featureidkey="properties.COUNTY",
+                                                   color='county', # Changed from 'submissions'
+                                                   mapbox_style="carto-positron", zoom=4.5, center={"lat": 0.0236, "lon": 37.9062},
+                                                   opacity=0.7, labels={'county':'County'})
+                    fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+                    st.plotly_chart(fig_map, use_container_width=True)
+                else:
+                    st.info("No county-specific feedback has been submitted for this bill yet.")
