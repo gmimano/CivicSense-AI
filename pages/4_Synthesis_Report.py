@@ -98,7 +98,7 @@ if st.button("Generate Official Report →", type="primary", use_container_width
         fig_pie.update_traces(textposition='inside', textinfo='percent+label')
 
         import base64
-        img_bytes = fig_pie.to_image(format="png", width=500, height=350, scale=2, engine="kaleido")
+        img_bytes = fig_pie.to_image(format="png", width=500, height=350, scale=2)
         chart_base64 = base64.b64encode(img_bytes).decode("utf-8")
         chart_html = f'<img src="data:image/png;base64,{chart_base64}" style="width: 100%; height: auto;">'
 
