@@ -22,10 +22,8 @@ xhtml2pdf                  # HTML to PDF conversion (alternative to weasyprint)
 altair                    # For nice charts in Streamlit
 vl-convert-python         # Required for Altair in Streamlit
 pandas
-plotly                    # For interactive charts
 numpy
 plotly                    # Alternative interactive charts
-kaleido                   # Required for Plotly static image export
 tenacity                  # Retry logic for scraping/LLM calls
 tqdm
 pymupdf
@@ -33,4 +31,3 @@ fitz
 fpdf2
 watchdog
 gtts
-kaleido

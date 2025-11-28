@@ -3,9 +3,7 @@ import pandas as pd
 from datetime import datetime
 from xhtml2pdf import pisa
 import plotly.express as px
-import base64
 from io import BytesIO
-import kaleido.scopes.plotly
 import sys
 import os
 
@@ -14,13 +12,6 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 from corefunc.db import supabase_client
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
-
-# --- Kaleido/Plotly Chrome Dependency Fix for Streamlit Cloud ---
-# On first run in a cloud environment, this will download a compatible
-# version of Chromium that Kaleido can use to generate static images.
-# See: https://github.com/plotly/Kaleido/issues/159
-kaleido.scopes.plotly.PlotlyScope.chromium_args += ("--headless", "--no-sandbox")
-
 
 st.title("📊 Public Participation Synthesis Report")
 
@@ -106,6 +97,7 @@ if st.button("Generate Official Report →", type="primary", use_container_width
         fig_pie.update_layout(showlegend=False)
         fig_pie.update_traces(textposition='inside', textinfo='percent+label')
 
+        import base64
         img_bytes = fig_pie.to_image(format="png", width=500, height=350, scale=2, engine="kaleido")
         chart_base64 = base64.b64encode(img_bytes).decode("utf-8")
         chart_html = f'<img src="data:image/png;base64,{chart_base64}" style="width: 100%; height: auto;">'
