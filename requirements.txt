@@ -33,3 +33,4 @@ fitz
 fpdf2
 watchdog
 gtts
+kaleido
