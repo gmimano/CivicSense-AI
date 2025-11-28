@@ -31,3 +31,4 @@ fitz
 fpdf2
 watchdog
 gtts
+kaleido==0.2.1
