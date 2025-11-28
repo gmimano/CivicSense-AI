@@ -5,6 +5,7 @@ from xhtml2pdf import pisa
 import plotly.express as px
 import base64
 from io import BytesIO
+import kaleido.scopes.plotly
 import sys
 import os
 
@@ -13,6 +14,12 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 from corefunc.db import supabase_client
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
+
+# --- Kaleido/Plotly Chrome Dependency Fix for Streamlit Cloud ---
+# On first run in a cloud environment, this will download a compatible
+# version of Chromium that Kaleido can use to generate static images.
+# See: https://github.com/plotly/Kaleido/issues/159
+kaleido.scopes.plotly.PlotlyScope.chromium_args += ("--headless", "--no-sandbox")
 
 
 st.title("📊 Public Participation Synthesis Report")
